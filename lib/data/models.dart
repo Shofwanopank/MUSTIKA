@@ -1,4 +1,5 @@
 enum OrderStatus { processing, ready, delivered }
+enum PaymentStatus { unpaid, dp, paid }
 
 class Customer {
   final String id;
@@ -118,6 +119,9 @@ class Order {
   final List<OrderItem> items;
   final double totalPrice;
   final double costPrice;
+  final double dp; // Down payment
+  final double remainingPayment; // Sisa pembayaran
+  final PaymentStatus paymentStatus; // Status pembayaran
   OrderStatus status;
   final String notes;
   final DateTime pickupDateTime;
@@ -132,6 +136,9 @@ class Order {
     required this.items,
     required this.totalPrice,
     required this.costPrice,
+    this.dp = 0,
+    this.remainingPayment = 0,
+    this.paymentStatus = PaymentStatus.unpaid,
     required this.status,
     required this.notes,
     required this.pickupDateTime,
@@ -164,6 +171,9 @@ class Order {
         'items': items.map((e) => e.toJson()).toList(),
         'totalPrice': totalPrice,
         'costPrice': costPrice,
+        'dp': dp,
+        'remainingPayment': remainingPayment,
+        'paymentStatus': paymentStatus.name,
         'status': status.name,
         'notes': notes,
         'pickupDateTime': pickupDateTime.toIso8601String(),
@@ -181,6 +191,11 @@ class Order {
             .toList(),
         totalPrice: (json['totalPrice'] as num).toDouble(),
         costPrice: (json['costPrice'] as num).toDouble(),
+        dp: (json['dp'] as num?)?.toDouble() ?? 0,
+        remainingPayment: (json['remainingPayment'] as num?)?.toDouble() ?? 0,
+        paymentStatus: PaymentStatus.values.firstWhere(
+          (e) => e.name == (json['paymentStatus'] ?? 'unpaid'),
+        ),
         status: OrderStatus.values.firstWhere((e) => e.name == json['status']),
         notes: json['notes'] ?? '',
         pickupDateTime: DateTime.parse(json['pickupDateTime']),

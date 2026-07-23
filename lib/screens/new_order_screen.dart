@@ -21,6 +21,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _notesController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _dpController = TextEditingController(); // <-- TAMBAH
   String _logisticsType = 'Pickup'; // Pickup or Delivery
 
   // Scheduling fields
@@ -38,6 +40,8 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _notesController.dispose();
+    _addressController.dispose();
+    _dpController.dispose(); // <-- TAMBAH
     super.dispose();
   }
 
@@ -52,6 +56,42 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       }
     });
     return total;
+  }
+
+  // ===== HELPER PAYMENT METHODS =====
+  Widget _buildPaymentRow(TextTheme textTheme, String label, double amount, {bool isTotal = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: textTheme.bodyMedium?.copyWith(
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        Text(
+          'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+          style: textTheme.bodyMedium?.copyWith(
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+            color: isTotal ? BakeryTheme.error : BakeryTheme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Color _getPaymentStatusColor(double total) {
+    final dp = double.tryParse(_dpController.text) ?? 0;
+    if (dp >= total) return BakeryTheme.success;
+    if (dp > 0) return BakeryTheme.tertiary;
+    return BakeryTheme.error;
+  }
+
+  String _getPaymentStatusText(double total) {
+    final dp = double.tryParse(_dpController.text) ?? 0;
+    if (dp >= total) return 'LUNAS';
+    if (dp > 0) return 'DP';
+    return 'BELUM DP';
   }
 
   void _submitOrder(
@@ -97,6 +137,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
 
     final totalRevenue = _calculateSubtotal(productProvider.products);
     final costPrice = totalRevenue * 0.45; // 45% default cost
+    final dp = double.tryParse(_dpController.text) ?? 0;
+    final remainingPayment = totalRevenue - dp;
+    final paymentStatus = dp >= totalRevenue ? PaymentStatus.paid : (dp > 0 ? PaymentStatus.dp : PaymentStatus.unpaid);
 
     // Get or Create Customer
     final customer = await customerProvider.getOrCreateCustomer(
@@ -110,6 +153,9 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       items: selectedItems,
       totalPrice: totalRevenue,
       costPrice: costPrice,
+      dp: dp,
+      remainingPayment: remainingPayment,
+      paymentStatus: paymentStatus,
       status: OrderStatus.processing,
       notes: _notesController.text.trim(),
       pickupDateTime: pickupDateTime,
@@ -481,34 +527,37 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                             ),
                           ),
                           // Qty selectors
-                          Row(
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.remove_circle_outline, color: BakeryTheme.primary),
-                                onPressed: qty > 0
-                                    ? () {
-                                        setState(() {
-                                          _quantities[product.id] = qty - 1;
-                                        });
-                                      }
-                                    : null,
+                          SizedBox(
+                            width: 60,
+                            child: TextFormField(
+                              initialValue: qty == 0 ? '' : '$qty',
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              style: textTheme.headlineMedium?.copyWith(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
                               ),
-                              Text(
-                                '$qty',
-                                style: textTheme.headlineMedium?.copyWith(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                              decoration: const InputDecoration(
+                                hintText: '0',
+                                contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.all(Radius.circular(8)),
                                 ),
+                                isDense: true,
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.add_circle_outline, color: BakeryTheme.primary),
-                                onPressed: () {
+                              onChanged: (val) {
+                                final parsed = int.tryParse(val);
+                                if (parsed != null && parsed >= 0) {
                                   setState(() {
-                                    _quantities[product.id] = qty + 1;
+                                    _quantities[product.id] = parsed;
                                   });
-                                },
-                              ),
-                            ],
+                                } else if (val.isEmpty) {
+                                  setState(() {
+                                    _quantities[product.id] = 0;
+                                  });
+                                }
+                              },
+                            ),
                           ),
                         ],
                       ),
@@ -551,7 +600,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
           TextFormField(
             controller: _nameController,
             decoration: const InputDecoration(
-              hintText: 'e.g. Budi Santoso',
               prefixIcon: Icon(Icons.person_outline),
             ),
             onChanged: (val) {
@@ -611,7 +659,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             controller: _phoneController,
             keyboardType: TextInputType.phone,
             decoration: const InputDecoration(
-              hintText: 'e.g. +62 812 3456 7890',
               prefixIcon: Icon(Icons.phone_outlined),
             ),
             validator: (value) {
@@ -622,6 +669,25 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             },
           ),
           const SizedBox(height: 24),
+          // Address Field
+          Text(
+            'Address',
+            style: textTheme.labelLarge?.copyWith(color: BakeryTheme.secondary),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: _addressController,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.location_on_outlined),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Address is required';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 20),
           // Pickup Date & Time Selector
           Text(
             'Pickup Date & Time',
@@ -674,34 +740,27 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             ],
           ),
           const SizedBox(height: 24),
-          // Production Estimate Dropdown
+
+          // ===== DP / DOWN PAYMENT FIELD =====
           Text(
-            'Production Estimate Time',
+            'Down Payment (DP)',
             style: textTheme.labelLarge?.copyWith(color: BakeryTheme.secondary),
           ),
           const SizedBox(height: 8),
-          DropdownButtonFormField<Duration>(
-            value: _productionEstimate,
-            decoration: InputDecoration(
-              fillColor: BakeryTheme.surfaceContainerLowest,
-              prefixIcon: const Icon(Icons.timer_outlined),
+          TextFormField(
+            controller: _dpController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              hintText: '0',
+              prefixText: 'Rp ',
+              prefixIcon: Icon(Icons.payment_outlined),
             ),
-            items: const [
-              DropdownMenuItem(value: Duration(minutes: 30), child: Text('30 Minutes')),
-              DropdownMenuItem(value: Duration(hours: 1), child: Text('1 Hour')),
-              DropdownMenuItem(value: Duration(hours: 2), child: Text('2 Hours')),
-              DropdownMenuItem(value: Duration(hours: 3), child: Text('3 Hours')),
-              DropdownMenuItem(value: Duration(hours: 4), child: Text('4 Hours')),
-            ],
             onChanged: (val) {
-              if (val != null) {
-                setState(() {
-                  _productionEstimate = val;
-                });
-              }
+              setState(() {}); // Refresh total
             },
           ),
           const SizedBox(height: 24),
+
           // Notes Field
           Text(
             'Special Instructions / Notes',
@@ -712,7 +771,6 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
             controller: _notesController,
             maxLines: 2,
             decoration: const InputDecoration(
-              hintText: 'e.g. Sliced sourdough, birthday writing "Happy Birthday", etc.',
               prefixIcon: Icon(Icons.notes),
             ),
           ),
@@ -800,9 +858,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       }
     });
 
-    final hrs = _productionEstimate.inHours;
-    final mins = _productionEstimate.inMinutes % 60;
-    final formattedEstimate = hrs > 0 ? '$hrs hr ${mins > 0 ? "$mins min" : ""}' : '$mins mins';
+    final totalCost = _calculateSubtotal(productProvider.products);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -848,6 +904,30 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
+                    const Icon(Icons.location_on_outlined, size: 16, color: BakeryTheme.primary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Address: ${_addressController.text.trim()}',
+                        style: textTheme.bodyMedium?.copyWith(color: BakeryTheme.onSurfaceVariant),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.receipt_long_outlined, size: 16, color: BakeryTheme.primary),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Order Date: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+                      style: textTheme.bodyMedium?.copyWith(color: BakeryTheme.onSurfaceVariant, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
                     const Icon(Icons.calendar_month, size: 16, color: BakeryTheme.primary),
                     const SizedBox(width: 6),
                     Text(
@@ -858,16 +938,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.timer_outlined, size: 16, color: BakeryTheme.primary),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Production Estimate: $formattedEstimate',
-                      style: textTheme.bodyMedium?.copyWith(color: BakeryTheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
+                
                 if (_notesController.text.trim().isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -931,6 +1002,55 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
                       ),
                     );
                   },
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+
+        // ===== PAYMENT SUMMARY CARD =====
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Payment Details',
+                  style: textTheme.labelLarge?.copyWith(color: BakeryTheme.primary),
+                ),
+                const Divider(),
+                const SizedBox(height: 8),
+                _buildPaymentRow(textTheme, 'Total Price', totalCost),
+                const SizedBox(height: 8),
+                _buildPaymentRow(
+                  textTheme,
+                  'DP',
+                  double.tryParse(_dpController.text) ?? 0,
+                ),
+                const SizedBox(height: 8),
+                _buildPaymentRow(
+                  textTheme,
+                  'Remaining',
+                  totalCost - (double.tryParse(_dpController.text) ?? 0),
+                  isTotal: true,
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _getPaymentStatusColor(totalCost),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _getPaymentStatusText(totalCost),
+                    style: TextStyle(
+                      color: BakeryTheme.onPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ],
             ),
