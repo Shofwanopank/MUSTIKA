@@ -156,7 +156,7 @@ class _NewOrderScreenState extends State<NewOrderScreen> {
       dp: dp,
       remainingPayment: remainingPayment,
       paymentStatus: paymentStatus,
-      status: OrderStatus.processing,
+      status: OrderStatus.menunggu,
       notes: _notesController.text.trim(),
       pickupDateTime: pickupDateTime,
       productionEstimate: _productionEstimate,

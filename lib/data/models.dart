@@ -1,4 +1,4 @@
-enum OrderStatus { processing, ready, delivered }
+enum OrderStatus { menunggu, diproduksi, siap, dikirim, selesai, batal }
 enum PaymentStatus { unpaid, dp, paid }
 
 class Customer {

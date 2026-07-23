@@ -16,6 +16,13 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Hive.initFlutter();
 
+  // ============================================================
+  // 🔴 HAPUS DATA LAMA (cukup 1x jalan, lalu comment/delete)
+  // ============================================================
+  // Hapus box orders karena data lama tidak punya field DP
+  await Hive.deleteBoxFromDisk('orders');
+  // ============================================================
+
   // Open Hive Boxes
   final productsBox = await Hive.openBox('products');
   final customersBox = await Hive.openBox('customers');

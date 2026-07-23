@@ -22,12 +22,12 @@ class ReminderService {
     final now = DateTime.now();
 
     for (var order in orders) {
-      if (order.status == OrderStatus.delivered) continue;
+      if (order.status == OrderStatus.selesai || order.status == OrderStatus.batal) continue;
 
       final diff = order.pickupDateTime.difference(now);
 
       // Check if overdue first
-      if (order.pickupDateTime.isBefore(now) && order.status != OrderStatus.delivered) {
+      if (order.pickupDateTime.isBefore(now) && order.status != OrderStatus.selesai && order.status != OrderStatus.batal) {
         list.add(SmartReminder(
           orderId: order.id,
           customerName: order.customer.name,

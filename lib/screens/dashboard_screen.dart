@@ -59,6 +59,30 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     });
   }
 
+  // ===== HELPER PAYMENT ROW =====
+  Widget _buildPaymentRow(TextTheme textTheme, String label, double amount, {bool isTotal = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: textTheme.bodyMedium?.copyWith(
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+            fontSize: 13,
+          ),
+        ),
+        Text(
+          'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}',
+          style: textTheme.bodyMedium?.copyWith(
+            fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+            color: isTotal ? BakeryTheme.error : BakeryTheme.onSurface,
+            fontSize: 13,
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final orderProvider = Provider.of<OrderProvider>(context);
@@ -70,7 +94,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final todayList = orderProvider.todaysOrders;
     final upcomingList = orderProvider.tomorrowsOrders + orderProvider.upcomingOrders;
     final pastList = orderProvider.orders
-        .where((o) => o.status == OrderStatus.delivered)
+        .where((o) => o.status == OrderStatus.selesai || o.status == OrderStatus.batal)
         .toList();
 
     // Calendar filter
@@ -78,7 +102,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       return o.pickupDateTime.year == _selectedCalendarDate.year &&
           o.pickupDateTime.month == _selectedCalendarDate.month &&
           o.pickupDateTime.day == _selectedCalendarDate.day &&
-          o.status != OrderStatus.delivered;
+          o.status != OrderStatus.selesai &&
+          o.status != OrderStatus.batal;
     }).toList();
 
     return Scaffold(
@@ -431,7 +456,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           o.pickupDateTime.year == cellDate.year &&
           o.pickupDateTime.month == cellDate.month &&
           o.pickupDateTime.day == cellDate.day &&
-          o.status != OrderStatus.delivered);
+          o.status != OrderStatus.selesai &&
+          o.status != OrderStatus.batal);
 
       dayCells.add(
         GestureDetector(
@@ -560,12 +586,35 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   ) {
     final textTheme = Theme.of(context).textTheme;
 
-    Color statusBgColor = BakeryTheme.primaryContainer;
-    Color statusTextColor = BakeryTheme.onPrimaryContainer;
+    // ===== STATUS WARNA =====
+    Color statusBgColor;
+    Color statusTextColor;
 
-    if (order.status == OrderStatus.ready) {
-      statusBgColor = BakeryTheme.successContainer;
-      statusTextColor = BakeryTheme.onSuccessContainer;
+    switch (order.status) {
+      case OrderStatus.menunggu:
+        statusBgColor = Colors.amber.withOpacity(0.15);
+        statusTextColor = Colors.amber.shade800;
+        break;
+      case OrderStatus.diproduksi:
+        statusBgColor = Colors.orange.withOpacity(0.15);
+        statusTextColor = Colors.orange.shade800;
+        break;
+      case OrderStatus.siap:
+        statusBgColor = Colors.blue.withOpacity(0.15);
+        statusTextColor = Colors.blue.shade800;
+        break;
+      case OrderStatus.dikirim:
+        statusBgColor = Colors.purple.withOpacity(0.15);
+        statusTextColor = Colors.purple.shade800;
+        break;
+      case OrderStatus.selesai:
+        statusBgColor = BakeryTheme.successContainer;
+        statusTextColor = BakeryTheme.onSuccessContainer;
+        break;
+      case OrderStatus.batal:
+        statusBgColor = BakeryTheme.errorContainer;
+        statusTextColor = BakeryTheme.onErrorContainer;
+        break;
     }
 
     Color priorityColor = BakeryTheme.outline;
@@ -642,48 +691,48 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-  children: [
-    Flexible(
-      child: Text(
-        '#${order.id}',
-        style: textTheme.labelLarge?.copyWith(fontSize: 13, fontWeight: FontWeight.bold),
-        overflow: TextOverflow.ellipsis,
-      ),
-    ),
-    const SizedBox(width: 4),
-    Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: priorityColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: priorityColor.withOpacity(0.3)),
-      ),
-      child: Text(
-        order.priority.substring(0, 1), // Hanya tampil huruf pertama (H/M/L)
-        style: TextStyle(color: priorityColor, fontSize: 8, fontWeight: FontWeight.bold),
-      ),
-    ),
-    const SizedBox(width: 4),
-    Flexible(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        decoration: BoxDecoration(
-          color: statusBgColor,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Text(
-            order.status.name.toUpperCase(),
-            style: TextStyle(color: statusTextColor, fontSize: 7, fontWeight: FontWeight.bold),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ),
-    ),
-  ],
-),
+                    children: [
+                      Flexible(
+                        child: Text(
+                          '#${order.id}',
+                          style: textTheme.labelLarge?.copyWith(fontSize: 13, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: priorityColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: priorityColor.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          order.priority.substring(0, 1), // Hanya tampil huruf pertama (H/M/L)
+                          style: TextStyle(color: priorityColor, fontSize: 8, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: statusBgColor,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              _getStatusLabel(order.status),
+                              style: TextStyle(color: statusTextColor, fontSize: 7, fontWeight: FontWeight.bold),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                       const SizedBox(height: 4),
                       Text(
                         order.customer.name,
@@ -727,6 +776,123 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
+  String _getStatusLabel(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.menunggu:
+        return 'Menunggu';
+      case OrderStatus.diproduksi:
+        return 'Diproduksi';
+      case OrderStatus.siap:
+        return 'Siap';
+      case OrderStatus.dikirim:
+        return 'Dikirim';
+      case OrderStatus.selesai:
+        return 'Selesai';
+      case OrderStatus.batal:
+        return 'Batal';
+    }
+  }
+
+  void _showEditOrderDialog(BuildContext context, Order order, OrderProvider provider) {
+    final dpController = TextEditingController(text: '${order.dp.toInt()}');
+    final notesController = TextEditingController(text: order.notes);
+    PaymentStatus selectedPaymentStatus = order.paymentStatus;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: BakeryTheme.surfaceContainerLowest,
+              title: Text('Edit Order #${order.id}', style: const TextStyle(color: BakeryTheme.primary)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Customer info (read-only)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(order.customer.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(order.customer.phone),
+                      leading: const Icon(Icons.person, color: BakeryTheme.primary),
+                    ),
+                    const Divider(),
+                    // DP
+                    TextField(
+                      controller: dpController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Down Payment (DP)',
+                        prefixText: 'Rp ',
+                        prefixIcon: Icon(Icons.payment_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Notes
+                    TextField(
+                      controller: notesController,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: 'Notes',
+                        prefixIcon: Icon(Icons.notes),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Payment Status
+                    DropdownButtonFormField<PaymentStatus>(
+                      value: selectedPaymentStatus,
+                      decoration: const InputDecoration(
+                        labelText: 'Payment Status',
+                        prefixIcon: Icon(Icons.flag_outlined),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: PaymentStatus.unpaid, child: Text('Belum DP')),
+                        DropdownMenuItem(value: PaymentStatus.dp, child: Text('DP')),
+                        DropdownMenuItem(value: PaymentStatus.paid, child: Text('Lunas')),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() {
+                            selectedPaymentStatus = val;
+                          });
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel', style: TextStyle(color: BakeryTheme.outline)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final newDp = double.tryParse(dpController.text) ?? order.dp;
+                    
+                    provider.updateOrderPayment(
+                      order.id,
+                      dp: newDp,
+                      paymentStatus: selectedPaymentStatus,
+                      notes: notesController.text.trim(),
+                    );
+                    
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Order #${order.id} updated!')),
+                    );
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _showOrderDetailsSheet(BuildContext context, Order order, OrderProvider provider) {
     final textTheme = Theme.of(context).textTheme;
 
@@ -740,13 +906,27 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            int activeStep = 0;
-            if (order.status == OrderStatus.ready) {
-              activeStep = 3;
-            } else if (order.status == OrderStatus.delivered) {
-              activeStep = 4;
-            } else {
-              activeStep = 1;
+            // ===== ACTIVE STEP BERDASARKAN STATUS =====
+            int activeStep;
+            switch (order.status) {
+              case OrderStatus.menunggu:
+                activeStep = 0;
+                break;
+              case OrderStatus.diproduksi:
+                activeStep = 1;
+                break;
+              case OrderStatus.siap:
+                activeStep = 2;
+                break;
+              case OrderStatus.dikirim:
+                activeStep = 3;
+                break;
+              case OrderStatus.selesai:
+                activeStep = 4;
+                break;
+              case OrderStatus.batal:
+                activeStep = 0;
+                break;
             }
 
             final hrs = order.productionEstimate.inHours;
@@ -786,17 +966,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: order.status == OrderStatus.ready
+                              color: order.status == OrderStatus.selesai
                                   ? BakeryTheme.successContainer
-                                  : BakeryTheme.primaryContainer,
+                                  : order.status == OrderStatus.batal
+                                      ? BakeryTheme.errorContainer
+                                      : BakeryTheme.primaryContainer,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              order.status.name.toUpperCase(),
+                              _getStatusLabel(order.status).toUpperCase(),
                               style: TextStyle(
-                                color: order.status == OrderStatus.ready
+                                color: order.status == OrderStatus.selesai
                                     ? BakeryTheme.onSuccessContainer
-                                    : BakeryTheme.onPrimaryContainer,
+                                    : order.status == OrderStatus.batal
+                                        ? BakeryTheme.onErrorContainer
+                                        : BakeryTheme.onPrimaryContainer,
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -806,21 +990,21 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       ),
                       const SizedBox(height: 16),
 
-                      // Timeline
+                      // ===== TIMELINE =====
                       Text(
                         'Production Timeline',
                         style: textTheme.labelLarge?.copyWith(color: BakeryTheme.primary, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 16),
-                      _buildTimelineRow(context, 'Ordered', 'Placement date: ${order.createdAt.day}/${order.createdAt.month}', activeStep >= 0, activeStep == 0),
+                      _buildTimelineRow(context, 'Menunggu', 'Pesanan diterima', activeStep >= 0, activeStep == 0),
                       _buildTimelineConnector(activeStep > 0),
-                      _buildTimelineRow(context, 'Prepping', 'Dough/filling preparation', activeStep >= 1, activeStep == 1),
+                      _buildTimelineRow(context, 'Diproduksi', 'Proses pembuatan', activeStep >= 1, activeStep == 1),
                       _buildTimelineConnector(activeStep > 1),
-                      _buildTimelineRow(context, 'Baking', 'Oven active / cooking phase', activeStep >= 2, activeStep == 2),
+                      _buildTimelineRow(context, 'Siap Diambil', 'Menunggu pickup', activeStep >= 2, activeStep == 2),
                       _buildTimelineConnector(activeStep > 2),
-                      _buildTimelineRow(context, 'Ready', 'Cooling / Ready to pickup', activeStep >= 3, activeStep == 3),
+                      _buildTimelineRow(context, 'Dikirim', 'Dalam pengiriman', activeStep >= 3, activeStep == 3),
                       _buildTimelineConnector(activeStep > 3),
-                      _buildTimelineRow(context, 'Picked Up', 'Delivered to customer', activeStep >= 4, activeStep == 4),
+                      _buildTimelineRow(context, 'Selesai', 'Pesanan selesai', activeStep >= 4, activeStep == 4),
 
                       const Divider(height: 32),
 
@@ -876,50 +1060,127 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
                       const Divider(height: 32),
 
-                      // Actions
+                      // ===== PAYMENT SECTION =====
+                      Text(
+                        'Payment Details',
+                        style: textTheme.labelLarge?.copyWith(color: BakeryTheme.primary, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildPaymentRow(textTheme, 'Total Price', order.totalPrice),
+                      const SizedBox(height: 6),
+                      _buildPaymentRow(textTheme, 'DP', order.dp),
+                      const SizedBox(height: 6),
+                      _buildPaymentRow(textTheme, 'Remaining', order.remainingPayment, isTotal: true),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: order.paymentStatus == PaymentStatus.paid
+                              ? BakeryTheme.success
+                              : order.paymentStatus == PaymentStatus.dp
+                                  ? BakeryTheme.tertiary
+                                  : BakeryTheme.error,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          order.paymentStatus == PaymentStatus.paid
+                              ? 'LUNAS'
+                              : order.paymentStatus == PaymentStatus.dp
+                                  ? 'DP'
+                                  : 'BELUM DP',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+
+                      const Divider(height: 32),
+
+                      // ===== ACTIONS =====
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              provider.removeOrder(order.id);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Order #${order.id} cancelled.')),
-                              );
-                            },
-                            child: const Text('Cancel Order', style: TextStyle(color: BakeryTheme.error)),
+                          // Cancel + Edit
+                          Row(
+                            children: [
+                              TextButton.icon(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  provider.removeOrder(order.id);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Order #${order.id} cancelled.')),
+                                  );
+                                },
+                                icon: const Icon(Icons.delete_outline, size: 18),
+                                label: const Text('Cancel', style: TextStyle(color: BakeryTheme.error)),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton.icon(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  _showEditOrderDialog(context, order, provider);
+                                },
+                                icon: const Icon(Icons.edit_outlined, size: 18),
+                                label: const Text('Edit', style: TextStyle(color: BakeryTheme.primary)),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 16),
-                          ElevatedButton(
-                            onPressed: () {
-                              if (order.status == OrderStatus.processing) {
-                                provider.updateOrderStatus(order.id, OrderStatus.ready);
+                          // Status Action Button
+                          if (order.status != OrderStatus.selesai && order.status != OrderStatus.batal)
+                            ElevatedButton(
+                              onPressed: () {
+                                OrderStatus nextStatus;
+                                String message;
+
+                                switch (order.status) {
+                                  case OrderStatus.menunggu:
+                                    nextStatus = OrderStatus.diproduksi;
+                                    message = 'Order #${order.id} mulai diproduksi!';
+                                    break;
+                                  case OrderStatus.diproduksi:
+                                    nextStatus = OrderStatus.siap;
+                                    message = 'Order #${order.id} siap diambil!';
+                                    break;
+                                  case OrderStatus.siap:
+                                    nextStatus = OrderStatus.dikirim;
+                                    message = 'Order #${order.id} dalam pengiriman!';
+                                    break;
+                                  case OrderStatus.dikirim:
+                                    nextStatus = OrderStatus.selesai;
+                                    message = 'Order #${order.id} SELESAI!';
+                                    break;
+                                  default:
+                                    nextStatus = order.status;
+                                    message = '';
+                                }
+
+                                provider.updateOrderStatus(order.id, nextStatus);
                                 setSheetState(() {
-                                  order.status = OrderStatus.ready;
+                                  order.status = nextStatus;
                                 });
+
+                                if (nextStatus == OrderStatus.selesai) {
+                                  Navigator.pop(context);
+                                }
+
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Order #${order.id} is now READY!')),
+                                  SnackBar(content: Text(message)),
                                 );
-                              } else if (order.status == OrderStatus.ready) {
-                                provider.updateOrderStatus(order.id, OrderStatus.delivered);
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Order #${order.id} DELIVERED and closed.')),
-                                );
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: order.status == OrderStatus.ready
-                                  ? BakeryTheme.secondary
-                                  : BakeryTheme.primary,
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: order.status == OrderStatus.siap
+                                    ? BakeryTheme.secondary
+                                    : BakeryTheme.primary,
+                              ),
+                              child: Text(
+                                order.status == OrderStatus.menunggu ? 'Mulai Produksi' :
+                                order.status == OrderStatus.diproduksi ? 'Siap Diambil' :
+                                order.status == OrderStatus.siap ? 'Konfirmasi Dikirim' :
+                                'Selesaikan',
+                              ),
                             ),
-                            child: Text(
-                              order.status == OrderStatus.ready
-                                  ? 'Confirm Delivery'
-                                  : 'Mark Ready',
-                            ),
-                          ),
                         ],
                       ),
                     ],

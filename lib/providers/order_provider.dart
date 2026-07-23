@@ -14,16 +14,14 @@ class OrderProvider extends ChangeNotifier {
 
   Future<void> loadOrders() async {
     _orders = await _repository.getOrders();
-    // Sort orders by pickup date ascending
     _orders.sort((a, b) => a.pickupDateTime.compareTo(b.pickupDateTime));
     notifyListeners();
   }
 
-  // Segmented Dashboard List Getters (Computed dynamically)
   List<Order> get todaysOrders {
     final now = DateTime.now();
     return _orders.where((o) {
-      return o.status != OrderStatus.delivered &&
+      return o.status != OrderStatus.selesai && o.status != OrderStatus.batal &&
           o.pickupDateTime.year == now.year &&
           o.pickupDateTime.month == now.month &&
           o.pickupDateTime.day == now.day;
@@ -33,7 +31,7 @@ class OrderProvider extends ChangeNotifier {
   List<Order> get tomorrowsOrders {
     final tomorrow = DateTime.now().add(const Duration(days: 1));
     return _orders.where((o) {
-      return o.status != OrderStatus.delivered &&
+      return o.status != OrderStatus.selesai && o.status != OrderStatus.batal &&
           o.pickupDateTime.year == tomorrow.year &&
           o.pickupDateTime.month == tomorrow.month &&
           o.pickupDateTime.day == tomorrow.day;
@@ -43,21 +41,19 @@ class OrderProvider extends ChangeNotifier {
   List<Order> get upcomingOrders {
     final tomorrowEnd = DateTime.now().add(const Duration(days: 1)).copyWith(hour: 23, minute: 59, second: 59);
     return _orders.where((o) {
-      return o.status != OrderStatus.delivered &&
+      return o.status != OrderStatus.selesai && o.status != OrderStatus.batal &&
           o.pickupDateTime.isAfter(tomorrowEnd);
     }).toList();
   }
 
   List<Order> get readyOrders {
-    return _orders.where((o) => o.status == OrderStatus.ready).toList();
+    return _orders.where((o) => o.status == OrderStatus.siap).toList();
   }
 
-  // Smart Reminders (Computed dynamically via ReminderService)
   List<SmartReminder> get smartReminders {
     return ReminderService.calculateReminders(_orders);
   }
 
-  // Statistics (Computed dynamically via ReportService)
   double get totalRevenue => ReportService.calculateTotalRevenue(_orders);
   double get totalCost => ReportService.calculateTotalCost(_orders);
   double get totalProfit => ReportService.calculateTotalProfit(_orders);
@@ -68,7 +64,6 @@ class OrderProvider extends ChangeNotifier {
 
   int get readyToPickupCount => readyOrders.length;
 
-  // Order CRUD Actions
   Future<void> addOrder(Order order) async {
     _orders.add(order);
     _orders.sort((a, b) => a.pickupDateTime.compareTo(b.pickupDateTime));
@@ -86,8 +81,43 @@ class OrderProvider extends ChangeNotifier {
         items: existing.items,
         totalPrice: existing.totalPrice,
         costPrice: existing.costPrice,
+        dp: existing.dp,
+        remainingPayment: existing.remainingPayment,
+        paymentStatus: existing.paymentStatus,
         status: status,
         notes: existing.notes,
+        pickupDateTime: existing.pickupDateTime,
+        productionEstimate: existing.productionEstimate,
+        priority: existing.priority,
+        createdAt: existing.createdAt,
+        updatedAt: DateTime.now(),
+      );
+
+      _orders[index] = updatedOrder;
+      await _repository.saveOrder(updatedOrder);
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateOrderPayment(String id, {
+    required double dp,
+    required PaymentStatus paymentStatus,
+    required String notes,
+  }) async {
+    final index = _orders.indexWhere((o) => o.id == id);
+    if (index != -1) {
+      final existing = _orders[index];
+      final updatedOrder = Order(
+        id: existing.id,
+        customer: existing.customer,
+        items: existing.items,
+        totalPrice: existing.totalPrice,
+        costPrice: existing.costPrice,
+        dp: dp,
+        remainingPayment: existing.totalPrice - dp,
+        paymentStatus: paymentStatus,
+        status: existing.status,
+        notes: notes,
         pickupDateTime: existing.pickupDateTime,
         productionEstimate: existing.productionEstimate,
         priority: existing.priority,
