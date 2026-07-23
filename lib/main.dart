@@ -20,6 +20,7 @@ void main() async {
   final productsBox = await Hive.openBox('products');
   final customersBox = await Hive.openBox('customers');
   final ordersBox = await Hive.openBox('orders');
+  final authBox = await Hive.openBox('auth'); // Box untuk session login
 
   // Repositories
   final productRepo = HiveProductRepository(productsBox);
@@ -36,6 +37,9 @@ void main() async {
   await customerProvider.loadCustomers();
   await orderProvider.loadOrders();
 
+  // Cek apakah user sudah login sebelumnya
+  final isLoggedIn = authBox.get('isLoggedIn', defaultValue: false);
+
   runApp(
     MultiProvider(
       providers: [
@@ -43,13 +47,15 @@ void main() async {
         ChangeNotifierProvider.value(value: customerProvider),
         ChangeNotifierProvider.value(value: orderProvider),
       ],
-      child: const MyApp(),
+      child: MyApp(isLoggedIn: isLoggedIn),
     ),
   );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isLoggedIn;
+
+  const MyApp({super.key, required this.isLoggedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +63,7 @@ class MyApp extends StatelessWidget {
       title: 'Roti Mustika Admin Portal',
       theme: BakeryTheme.lightTheme,
       debugShowCheckedModeBanner: false,
-      initialRoute: '/',
+      initialRoute: isLoggedIn ? '/dashboard' : '/', // Auto-redirect jika sudah login
       routes: {
         '/': (context) => const LoginScreen(),
         '/dashboard': (context) => const MainShell(),
@@ -82,6 +88,19 @@ class _MainShellState extends State<MainShell> {
     const ProductsScreen(),
     const ReportsScreen(),
   ];
+
+  void _logout() async {
+    // Hapus session dari Hive
+    final authBox = Hive.box('auth');
+    await authBox.put('isLoggedIn', false);
+    await authBox.delete('username');
+    await authBox.delete('loginTime');
+
+    // Kembali ke halaman login
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

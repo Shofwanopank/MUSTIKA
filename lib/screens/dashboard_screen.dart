@@ -7,6 +7,7 @@ import '../providers/product_provider.dart';
 import '../providers/order_provider.dart';
 import '../theme/bakery_theme.dart';
 import '../services/reminder_service.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -27,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -65,11 +66,12 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final productProvider = Provider.of<ProductProvider>(context);
     final textTheme = Theme.of(context).textTheme;
 
-    // Filter active orders for segmented tabs
+    // Filter orders for segmented tabs
     final todayList = orderProvider.todaysOrders;
-    final tomorrowList = orderProvider.tomorrowsOrders;
-    final upcomingList = orderProvider.upcomingOrders;
-    final readyList = orderProvider.readyOrders;
+    final upcomingList = orderProvider.tomorrowsOrders + orderProvider.upcomingOrders;
+    final pastList = orderProvider.orders
+        .where((o) => o.status == OrderStatus.delivered)
+        .toList();
 
     // Calendar filter
     final calendarFilteredOrders = orderProvider.orders.where((o) {
@@ -80,6 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     }).toList();
 
     return Scaffold(
+      
       appBar: AppBar(
         backgroundColor: BakeryTheme.surface,
         elevation: 0,
@@ -89,7 +92,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             const Icon(Icons.bakery_dining_outlined, color: BakeryTheme.primary, size: 32),
             const SizedBox(width: 8),
             Text(
-              'Roti Mustika',
+              '',
               style: textTheme.headlineMedium?.copyWith(
                 color: BakeryTheme.primary,
                 fontWeight: FontWeight.bold,
@@ -97,6 +100,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             ),
           ],
         ),
+
+        
         actions: [
           // Customer Directory CRUD Button
           IconButton(
@@ -117,25 +122,22 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
               });
             },
           ),
-          const SizedBox(width: 8),
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            width: 40,
-            height: 40,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: BakeryTheme.primaryContainer,
-            ),
-            child: const Center(
-              child: Text(
-                'RM',
-                style: TextStyle(
-                  color: BakeryTheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
+
+           IconButton(
+          icon: const Icon(Icons.logout, color: BakeryTheme.error),
+          tooltip: 'Logout',
+          onPressed: () async {
+            final authBox = Hive.box('auth');
+            await authBox.put('isLoggedIn', false);
+            await authBox.delete('username');
+            await authBox.delete('loginTime');
+            
+            if (context.mounted) {
+              Navigator.pushReplacementNamed(context, '/');
+            }
+          },
+        ),
+        // ===== SAMPAI SINI =====
         ],
       ),
       body: orderProvider.orders.isEmpty
@@ -238,9 +240,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                           labelStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
                           tabs: [
                             Tab(text: 'Today (${todayList.length})'),
-                            Tab(text: 'Tomorrow (${tomorrowList.length})'),
                             Tab(text: 'Upcoming (${upcomingList.length})'),
-                            Tab(text: 'Ready (${readyList.length})'),
+                            Tab(text: 'Past (${pastList.length})'),
                           ],
                         ),
                         const SizedBox(height: 20),
@@ -252,9 +253,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             controller: _tabController,
                             children: [
                               _buildTabOrderList(context, todayList, orderProvider, productProvider),
-                              _buildTabOrderList(context, tomorrowList, orderProvider, productProvider),
                               _buildTabOrderList(context, upcomingList, orderProvider, productProvider),
-                              _buildTabOrderList(context, readyList, orderProvider, productProvider),
+                              _buildTabOrderList(context, pastList, orderProvider, productProvider),
                             ],
                           ),
                         ),
@@ -642,38 +642,48 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        children: [
-                          Text(
-                            '#${order.id}',
-                            style: textTheme.labelLarge?.copyWith(fontSize: 15, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: priorityColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: priorityColor.withOpacity(0.3)),
-                            ),
-                            child: Text(
-                              order.priority,
-                              style: TextStyle(color: priorityColor, fontSize: 8, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: statusBgColor,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              order.status.name.toUpperCase(),
-                              style: TextStyle(color: statusTextColor, fontSize: 8, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
+  children: [
+    Flexible(
+      child: Text(
+        '#${order.id}',
+        style: textTheme.labelLarge?.copyWith(fontSize: 13, fontWeight: FontWeight.bold),
+        overflow: TextOverflow.ellipsis,
+      ),
+    ),
+    const SizedBox(width: 4),
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: priorityColor.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: priorityColor.withOpacity(0.3)),
+      ),
+      child: Text(
+        order.priority.substring(0, 1), // Hanya tampil huruf pertama (H/M/L)
+        style: TextStyle(color: priorityColor, fontSize: 8, fontWeight: FontWeight.bold),
+      ),
+    ),
+    const SizedBox(width: 4),
+    Flexible(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        decoration: BoxDecoration(
+          color: statusBgColor,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            order.status.name.toUpperCase(),
+            style: TextStyle(color: statusTextColor, fontSize: 7, fontWeight: FontWeight.bold),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+    ),
+  ],
+),
                       const SizedBox(height: 4),
                       Text(
                         order.customer.name,
@@ -695,13 +705,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             '${order.pickupDateTime.hour.toString().padLeft(2, '0')}:${order.pickupDateTime.minute.toString().padLeft(2, '0')}',
                             style: textTheme.labelSmall?.copyWith(fontSize: 10, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(width: 10),
-                          const Icon(Icons.timer_outlined, size: 14, color: BakeryTheme.secondary),
-                          const SizedBox(width: 4),
-                          Text(
-                            estimateText,
-                            style: textTheme.labelSmall?.copyWith(fontSize: 10),
-                          ),
+                          
                         ],
                       ),
                     ],

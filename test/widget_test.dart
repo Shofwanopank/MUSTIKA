@@ -1,30 +1,24 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:rotimustika/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('App renders login screen when not logged in', (WidgetTester tester) async {
+    // Build app dengan isLoggedIn = false (belum login)
+    await tester.pumpWidget(const MyApp(isLoggedIn: false));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify that login screen muncul
+    expect(find.text('Roti Mustika'), findsOneWidget);
+    expect(find.text('BAKERY ADMIN PORTAL'), findsOneWidget);
+    expect(find.text('Login to Dashboard'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('App goes directly to dashboard when logged in', (WidgetTester tester) async {
+    // Build app dengan isLoggedIn = true (sudah login)
+    await tester.pumpWidget(const MyApp(isLoggedIn: true));
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify langsung masuk dashboard, bukan login screen
+    expect(find.text('Login to Dashboard'), findsNothing);
   });
 }

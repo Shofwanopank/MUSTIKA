@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/bakery_theme.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -23,23 +24,41 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+void _handleLogin() {
+  if (_formKey.currentState!.validate()) {
+    setState(() {
+      _isLoading = true;
+    });
 
-      // Mimic network call
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-          Navigator.pushReplacementNamed(context, '/dashboard');
+    // Mimic network call
+    Future.delayed(const Duration(milliseconds: 1500), () async {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        // Simpan session jika "Remember Me" dicentang
+        if (_rememberMe) {
+          final authBox = Hive.box('auth');
+          await authBox.put('isLoggedIn', true);
+          await authBox.put('username', _usernameController.text.trim());
+          await authBox.put('loginTime', DateTime.now().toIso8601String());
         }
-      });
-    }
+
+        // Tetap simpan session sementara (selama aplikasi hidup) 
+        // meskipun "Remember Me" tidak dicentang
+        if (!_rememberMe) {
+          final authBox = Hive.box('auth');
+          await authBox.put('isLoggedIn', true);
+          // Tidak simpan permanen, hanya untuk session saat ini
+          // Akan dihapus saat logout
+        }
+
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
+    });
   }
+}
 
   @override
   Widget build(BuildContext context) {
